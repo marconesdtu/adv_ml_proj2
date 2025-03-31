@@ -1,4 +1,5 @@
 import torch
+from curve import Curve
 
 def get_all_labels_and_latents(model, data_loader):
     all_latents = []
@@ -16,3 +17,9 @@ def get_all_labels_and_latents(model, data_loader):
         
         return all_latents, all_labels
                 
+
+def plot_curve(ax, curve: Curve, num_steps: int):
+    t = torch.linspace(0, 1, steps=num_steps)
+    curve_points = curve(t).detach().numpy()
+
+    ax.plot(curve_points[:, 0], curve_points[:, 1], label=curve.__str__(), color='black')
