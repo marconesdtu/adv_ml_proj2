@@ -444,7 +444,7 @@ if __name__ == "__main__":
         model.eval()
 
         with torch.no_grad():
-            x, y = next(iter(mnist_train_loader))
+            x, y = next(iter(mnist_test_loader))
             x = x.to(device)
             latent = model.encoder(x).rsample()
         
@@ -452,7 +452,7 @@ if __name__ == "__main__":
 
         chosen_pairs = list(zip(latent[indices[:args.num_curves]], latent[indices[args.num_curves:]]))
                         
-        decoder_fun = lambda x: model.decoder(x.unsqueeze(0)).mean.squeeze(0)
+        decoder_fun = lambda x: model.decoder(x).mean
         
         geodesics = tuple(map(lambda pair: compute_geodesic(pair[0], pair[1], decoder_fun),chosen_pairs))
         
@@ -461,8 +461,8 @@ if __name__ == "__main__":
                 plt.plot(curve[:, 0].detach().numpy(), curve[:, 1].detach().numpy(), linestyle='-', linewidth=1, label=str(i), color='black')
         
         # plotting the entire space 
-        all_latents, all_labels = get_all_labels_and_latents(model, mnist_train_loader)
-        plt.scatter(all_latents[:, 0].cpu(), all_latents[:, 1].cpu(), c=all_labels.cpu(), cmap='winter', alpha=0.05)
+        all_latents, all_labels = get_all_labels_and_latents(model, mnist_test_loader)
+        plt.scatter(all_latents[:, 0].cpu(), all_latents[:, 1].cpu(), c=all_labels.cpu(), cmap='winter', alpha=0.3)
 
         plt.title('Latent Space')
         plt.show()
