@@ -17,7 +17,8 @@ import math
 import matplotlib.pyplot as plt
 
 from geodesics import compute_geodesic
-from utils import get_all_labels_and_latents, plot_curve
+from utils import get_all_labels_and_latents
+from geodesics_ensemble import compute_geodesic_ensemble
 
 class GaussianPrior(nn.Module):
     def __init__(self, M):
@@ -221,7 +222,7 @@ if __name__ == "__main__":
         "mode",
         type=str,
         default="train",
-        choices=["train", "sample", "eval", "geodesics"],
+        choices=["train", "sample", "eval", "geodesics", "ensemble"],
         help="what to do when running the script (default: %(default)s)",
     )
     parser.add_argument(
@@ -453,19 +454,70 @@ if __name__ == "__main__":
         indices = torch.randperm(latent.size(0))[:(2 * args.num_curves)]
 
         chosen_pairs = list(zip(latent[indices[:args.num_curves]], latent[indices[args.num_curves:]]))
-                        
+
+
         decoder_fun = lambda x: model.decoder(x).mean
         
-        fig = plt.figure(figsize=(10, 12))
-        ax = fig.add_subplot(111)
+
+        geodesics = tuple(map(lambda pair: compute_geodesic_ensemble(pair[0], pair[1],decoder_fun), chosen_pairs))
+
         
         for i, curve in enumerate(geodesics):
             if curve is not None:
-                plot_curve(ax=ax, curve=curve, num_steps=100)
+                plt.plot(curve[:,0].detach().numpy(), curve[:,1].detach().numpy(), linestyle='-', linewidth=1, label = str(i), color = 'black')
         
         # plotting the entire space 
         all_latents, all_labels = get_all_labels_and_latents(model, mnist_test_loader)
         plt.scatter(all_latents[:, 0].cpu(), all_latents[:, 1].cpu(), c=all_labels.cpu(), cmap='winter', alpha=0.3)
 
-        ax.set_title('Latent Space')
+        plt.title('Latent Space')
+        plt.show()
+
+    elif args.mode == "ensemble":
+        experiment_folder = args.experiment_folder
+        model_range = range(0,10)
+        num_curves = args.num_curves
+        decoders = []
+        for i in model_range:
+            # Instantiate the model with the same encoder and decoder setup
+            model = VAE(
+                GaussianPrior(M),  # M is the latent dimension
+                GaussianDecoder(new_decoder()),
+                GaussianEncoder(new_encoder())
+            ).to(device)
+            
+            # Load the model's state dict
+            model.load_state_dict(torch.load(f"{experiment_folder}/model{i}.pt", weights_only=True))
+            model.eval()
+            
+            # Append the decoder function for this model
+            decoder_fun = lambda x: model.decoder(x).mean
+            decoders.append(decoder_fun)
+
+            device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    
+    
+        # Sample latent pairs for geodesic calculation
+        with torch.no_grad():
+            x, y = next(iter(mnist_test_loader))
+            x = x.to(device)
+            latent = model.encoder(x).rsample()
+        
+        # Randomly select pairs of latent points
+        indices = torch.randperm(latent.size(0))[:(2 * num_curves)]
+        chosen_pairs = list(zip(latent[indices[:num_curves]], latent[indices[num_curves:]]))
+        
+        # Compute geodesics for the chosen pairs
+        geodesics = tuple(map(lambda pair: compute_geodesic_ensemble(pair[0], pair[1], decoders, len(decoders)), chosen_pairs))
+
+        # Plot each geodesic curve
+        for i, curve in enumerate(geodesics):
+            if curve is not None:
+                plt.plot(curve[:, 0].detach().numpy(), curve[:, 1].detach().numpy(), linestyle='-', linewidth=1, label=str(i), color='black')
+        
+        # Plot the entire latent space
+        all_latents, all_labels = get_all_labels_and_latents(model, mnist_test_loader)
+        plt.scatter(all_latents[:, 0].cpu(), all_latents[:, 1].cpu(), c=all_labels.cpu(), cmap='winter', alpha=0.3)
+
+        plt.title('Latent Space and Geodesics')
         plt.show()
