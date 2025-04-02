@@ -453,10 +453,8 @@ if __name__ == "__main__":
         indices = torch.randperm(latent.size(0))[:(2 * args.num_curves)]
 
         chosen_pairs = list(zip(latent[indices[:args.num_curves]], latent[indices[args.num_curves:]]))
-        
+                        
         decoder_fun = lambda x: model.decoder(x).mean
-        
-        geodesics = tuple(map(lambda pair: compute_geodesic(pair[0].to(device), pair[1].to(device), decoder_fun, device),chosen_pairs))
         
         fig = plt.figure(figsize=(10, 12))
         ax = fig.add_subplot(111)
@@ -467,7 +465,7 @@ if __name__ == "__main__":
         
         # plotting the entire space 
         all_latents, all_labels = get_all_labels_and_latents(model, mnist_test_loader)
-        ax.scatter(all_latents[:, 0].cpu(), all_latents[:, 1].cpu(), c=all_labels.cpu(), cmap='winter', alpha=0.05)
+        plt.scatter(all_latents[:, 0].cpu(), all_latents[:, 1].cpu(), c=all_labels.cpu(), cmap='winter', alpha=0.3)
 
         ax.set_title('Latent Space')
         plt.show()
